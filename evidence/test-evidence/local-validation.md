@@ -37,7 +37,7 @@ Node.js: v26.8.1
 npm: 11.19.0
 ```
 
-The initial validation build resolved `node:latest` to digest `sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3`. That build remains part of the correction history. After the online failure, the hardened multi-stage candidate passed the same endpoints and UID check, ran Node v24.20.0, contained no npm/npx/Yarn runtime paths, and was 52,762,648 bytes.
+My initial validation build resolved `node:latest` to digest `sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3`. That build remains part of the correction history. After the online failure, my hardened multi-stage image passed the same endpoints and UID check, ran Node v24.20.0, contained no npm/npx/Yarn runtime paths, and was 52,762,648 bytes.
 
 ## Backup automation
 

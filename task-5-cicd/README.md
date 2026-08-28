@@ -51,7 +51,7 @@ The EC2 instance must:
 
 - Both fixable and currently unfixed HIGH/CRITICAL OS or Node.js library findings fail the pipeline.
 - No `.trivyignore` exceptions are included. A future exception must identify the CVE, owner, risk acceptance, compensating control, and expiry date.
-- The first candidate-aligned `node:latest` build failed the real gate with HIGH/CRITICAL findings. The final Dockerfile uses a digest-pinned Node 24 LTS builder and digest-pinned Alpine runtime without npm/Yarn, then installs the exact fixed OpenSSL package version reported by Trivy. Pins must be updated through reviewed, scanned changes rather than silently floating.
+- My first `node:latest` build failed the real gate with HIGH/CRITICAL findings. The final Dockerfile uses a digest-pinned Node 24 LTS builder and digest-pinned Alpine runtime without npm/Yarn, then installs the exact fixed OpenSSL package version reported by Trivy. I will update pins through reviewed, scanned changes rather than allowing them to float silently.
 - The ECR push cannot run until the scan passes.
 
 ## Deployment behavior

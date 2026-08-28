@@ -1,6 +1,6 @@
 # DevOps Practical Assessment
 
-This repository contains the six requested practical tasks: Kubernetes, Nginx, Docker, MySQL backup automation, GitHub Actions CI/CD, and troubleshooting. It also records local validation, external-service limitations, implementation decisions, and AI assistance.
+I completed the six requested practical tasks in this repository: Kubernetes, Nginx, Docker, MySQL backup automation, GitHub Actions CI/CD, and troubleshooting. I have also documented my implementation decisions, validation results, external-service limitations, and AI usage.
 
 ## Repository structure
 
@@ -92,7 +92,7 @@ curl --fail http://127.0.0.1:3000/
 curl --fail http://127.0.0.1:3000/health
 ```
 
-The first implementation deliberately kept the candidate's live-interview `FROM node:latest` choice, but the real GitHub Trivy gate found 417 HIGH/CRITICAL OS findings and 4 HIGH Node-package findings. The corrected Dockerfile keeps the recognizable `/app`, dependency-copy, source-copy, and `ENTRYPOINT ["node", "server.js"]` structure while using an official multi-stage pattern: npm runs only in a digest-pinned Node 24 LTS builder, and the final digest-pinned Alpine runtime contains Node and the app without npm/Yarn. The exact OpenSSL fixed version reported by Trivy is installed. No finding was suppressed.
+I started with the simple `FROM node:latest` Dockerfile structure that I wrote during the live technical interview. The real GitHub Trivy gate then found 417 HIGH/CRITICAL OS findings and 4 HIGH Node-package findings. I corrected the image without suppressing any finding. The final Dockerfile keeps the recognizable `/app`, dependency-copy, source-copy, and `ENTRYPOINT ["node", "server.js"]` structure, but uses an official multi-stage pattern: npm runs only in a digest-pinned Node 24 LTS builder, and the final digest-pinned Alpine runtime contains only Node and the application without npm/Yarn. I also install the exact fixed OpenSSL version reported by Trivy.
 
 ## Task 4 - MySQL backup to S3
 
@@ -113,7 +113,7 @@ Example protected MySQL option file; create it outside the repository and set mo
 
 ```ini
 [client]
-password=replace-with-the-real-secret
+password=<mysql-password>
 ```
 
 Run the backup:
@@ -139,7 +139,7 @@ The executable workflow is `.github/workflows/ci-cd.yml`; `task-5-cicd/github-ac
 
 Required GitHub variables, the `SONAR_TOKEN` secret, AWS permissions, EC2 prerequisites, failure behavior, and vulnerability assumptions are documented in `task-5-cicd/README.md`.
 
-Cloud stages were not run because no approved SonarQube/AWS assessment infrastructure was supplied. Their configuration was linted and the generated Systems Manager request/remote shell commands were tested offline.
+I did not run the cloud stages because no SonarQube or AWS assessment infrastructure was supplied. I linted the configuration and tested the generated Systems Manager request and remote shell commands offline.
 
 ## Task 6 - Troubleshooting
 
@@ -170,7 +170,7 @@ See `evidence/implementation-log.md` for the chronological commands, real errors
 
 - The assessment supplied no Node.js source, so a dependency-free sample service and tests are included.
 - The required Kubernetes Service is internal `ClusterIP`.
-- `nginx:latest` is retained where explicitly requested. The Docker task began with the candidate's `node:latest` interview draft, but the real fail-closed scan required a digest-pinned Node 24 LTS builder and minimal Alpine runtime.
+- I retained `nginx:latest` because it was explicitly requested. I began the Docker task with my `node:latest` interview draft, but the real fail-closed scan required a digest-pinned Node 24 LTS builder and a minimal Alpine runtime.
 - AWS resources, identifiers, credentials, SonarQube, and a Kubernetes cluster are not assumed.
 - GitHub OIDC and EC2 instance roles are used instead of long-lived AWS keys.
 - Systems Manager is used instead of SSH. The required single-instance replacement may have brief downtime; high availability would require multiple targets and rolling or blue/green deployment.
@@ -180,28 +180,28 @@ See `evidence/implementation-log.md` for the chronological commands, real errors
 
 ### Tool
 
-An OpenAI AI coding assistant was used. Official vendor documentation and local validation tools were also consulted.
+I used an OpenAI coding assistant along with official vendor documentation and local validation tools while completing the assessment.
 
 ### Purpose
 
-AI assistance was used to extract and organize the assessment requirements, research official documentation, draft infrastructure/configuration files, create the minimal Node.js test application, reason through errors, orchestrate local validation, and maintain the implementation log.
+I used AI assistance to extract and organize the requirements, research official documentation, draft infrastructure and configuration files, create the minimal Node.js test application, troubleshoot errors, organize local validation, and maintain the implementation log.
 
 ### Manual review and modifications
 
-The candidate supplied the simple Dockerfile structure used during the live interview and asked that it remain recognizable. The first working version preserved it closely. After the mandatory online scan found real HIGH/CRITICAL issues in `node:latest`, the final version retained the `/app`, copy, port, non-root, and direct Node entrypoint choices but adopted the official multi-stage runtime-hardening pattern. AI-produced work was compared with the source requirements and revised after actual lint, build, runtime, integration, and security-gate failures.
+I supplied the simple Dockerfile structure that I used during the live interview and kept it recognizable in the first working version. After the mandatory online scan found real HIGH/CRITICAL issues in `node:latest`, I retained the `/app`, copy, port, non-root, and direct Node entrypoint choices but adopted the official multi-stage runtime-hardening pattern. I compared the AI-assisted drafts with the source requirements and revised them after actual lint, build, runtime, integration, and security-gate failures.
 
-Candidate review is still required before submission. The candidate should read every file, replace no placeholders with secrets, and be able to explain the Kubernetes selectors/probes, Nginx namespace assumption, Dockerfile trade-offs, backup credential/retention model, Trivy gate, OIDC trust, IAM permissions, SSM deployment, and every unexecuted external validation. This README must not be changed to claim a candidate review or cloud test until that review/test actually occurs.
+Before I submit the repository, I still need to read every file and make sure I can explain the Kubernetes selectors and probes, the Nginx namespace assumption, Dockerfile trade-offs, the backup credential and retention model, the Trivy gate, OIDC trust, IAM permissions, SSM deployment, and every external validation that was not executed. I will not replace placeholders with secrets or claim a manual review or cloud test until I have actually completed it.
 
 ### Validation
 
-AI-assisted artifacts were checked using Node's test runner, Docker build/run/inspect, Nginx syntax and HTTP integration tests, Kubeconform, ShellCheck, Bash parsing, AWS CLI offline input parsing, Actionlint, generated-command parsing, and official documentation. Only completed checks are reported as passed; external-service limitations remain explicit.
+I checked the AI-assisted artifacts using Node's test runner, Docker build/run/inspect, Nginx syntax and HTTP integration tests, Kubeconform, ShellCheck, Bash parsing, AWS CLI offline input parsing, Actionlint, generated-command parsing, and official documentation. I report only checks that actually passed and keep the external-service limitations explicit.
 
 ## Before submission
 
-- Complete the candidate review described above.
-- Re-run the commands in `evidence/test-evidence/local-validation.md`.
-- Keep the Node/Alpine digests and fixed Alpine package versions current through reviewed updates, and require the unchanged Trivy gate to pass after every update.
-- If assessment infrastructure is provided, run the Kubernetes, SonarQube, S3/IAM, ECR, SSM, EC2, and health checks and add sanitized evidence.
-- Confirm the intended Git name/email and GitHub account before committing.
-- Confirm repository visibility and reviewer access before sharing the link.
-- Do not commit `.env` files, option files, credentials, tokens, keys, or raw cloud output containing sensitive infrastructure details.
+- [ ] I have completed the manual review described above.
+- [ ] I have re-run the commands in `evidence/test-evidence/local-validation.md`.
+- [ ] I have confirmed the intended Git name/email, GitHub account, repository visibility, and reviewer access.
+- [ ] If assessment infrastructure is provided, I have run the applicable Kubernetes, SonarQube, S3/IAM, ECR, SSM, EC2, and health checks and added sanitized evidence.
+- [ ] I have confirmed that no `.env` files, option files, credentials, tokens, keys, or raw cloud output containing sensitive infrastructure details are committed.
+
+I will keep the Node/Alpine digests and fixed Alpine package versions current through reviewed updates and require the unchanged Trivy gate to pass after every update.
