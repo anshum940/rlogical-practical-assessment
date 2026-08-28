@@ -162,7 +162,7 @@ Each scenario starts with evidence collection, explains why each check matters, 
 | Docker | Hardened multi-stage build, endpoints, UID 1000, and absence of npm/Yarn in the final image passed | Digest/package pins require routine security updates |
 | Backup | Bash, ShellCheck, failure path, real local MySQL dump/gzip, and lifecycle input passed | S3 boundary mocked; no real IAM/S3 run |
 | CI/CD | Copies identical, Actionlint passed, SSM JSON/AWS input parse and six shell syntax checks passed | No SonarQube/ECR/EC2 execution |
-| Trivy | Initial image failed closed; hardened branch retest passed with 0 Alpine and 0 Node-package findings at HIGH/CRITICAL | Re-scan every rebuilt/updated image |
+| Trivy | Initial image failed closed; hardened `main` retest passed with 0 Alpine and 0 Node-package findings at HIGH/CRITICAL | Re-scan every rebuilt/updated image |
 
 See `evidence/implementation-log.md` for the chronological commands, real errors, corrections, outputs, decisions, and remaining external checks.
 

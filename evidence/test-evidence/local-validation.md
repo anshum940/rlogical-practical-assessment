@@ -123,3 +123,7 @@ ECR/deployment: skipped because deploy=false
 Passing branch run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204627031
 
 No ignore file, severity reduction, `ignore-unfixed` change, or success-forcing exit code was introduced.
+
+The same commits were fast-forwarded to `main`. Final main run `33204905174` also passed tests, image build, and Trivy with the same zero-finding report; SonarQube was explicitly skipped because no external configuration exists, and AWS stages were skipped for the normal push event.
+
+Passing main run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204905174

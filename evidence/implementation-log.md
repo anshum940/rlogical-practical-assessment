@@ -936,3 +936,23 @@ Overall workflow: passed
 ```
 
 The security gate itself was not changed between the failed and passing runs. The candidate is now eligible for fast-forward integration into `main`; a final `main` push run is still required before declaring the repository workflow green.
+
+### Main integration and final online result
+
+The clean `runtime-hardening` branch was fast-forwarded into local `main`; no merge rewrite, force push, or history replacement was used. Main was pushed from `aadb414` to `acd401e`, which triggered workflow run `33204905174` for the exact integrated commit.
+
+Run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204905174
+
+```text
+Test and SonarQube job: passed
+Application dependency install/tests: passed
+SonarQube: transparently skipped because SONAR_TOKEN/SONAR_HOST_URL are absent
+Docker image build: passed
+Trivy HIGH/CRITICAL scan: passed
+Trivy Alpine target: 0 vulnerabilities
+Trivy Node-package target: 0 vulnerabilities
+AWS/ECR/EC2 stages: skipped on the normal push event
+Overall main workflow: passed
+```
+
+The temporary remote `runtime-hardening` branch was then deleted because all its commits are reachable from `main`; the matching local branch was deleted with Git's merged-branch safety check. Only `main` remains necessary. This final result is recorded in a documentation-only commit using `[skip ci]` to avoid an identical redundant scan; the earlier passing main run remains linked above.
