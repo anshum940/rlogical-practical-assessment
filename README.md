@@ -92,7 +92,7 @@ curl --fail http://127.0.0.1:3000/
 curl --fail http://127.0.0.1:3000/health
 ```
 
-The Dockerfile deliberately keeps the candidate's live-interview choices `FROM node:latest`, `WORKDIR /app`, `COPY . .`, and `ENTRYPOINT`. It corrects the npm command, dependency-layer order, executable path, port declaration, and runtime user. `node:latest` is mutable; a production image should normally use a supported LTS variant pinned by digest.
+The first implementation deliberately kept the candidate's live-interview `FROM node:latest` choice, but the real GitHub Trivy gate found 417 HIGH/CRITICAL OS findings and 4 HIGH Node-package findings. The corrected Dockerfile keeps the recognizable `/app`, dependency-copy, source-copy, and `ENTRYPOINT ["node", "server.js"]` structure while using an official multi-stage pattern: npm runs only in a digest-pinned Node 24 LTS builder, and the final digest-pinned Alpine runtime contains Node and the app without npm/Yarn. The exact OpenSSL fixed version reported by Trivy is installed. No finding was suppressed.
 
 ## Task 4 - MySQL backup to S3
 
@@ -159,10 +159,10 @@ Each scenario starts with evidence collection, explains why each check matters, 
 | Kubernetes | 2/2 manifests passed strict schema validation | No live cluster/admission test |
 | Nginx | `nginx -t`, HTTP 301, and reverse proxy passed | Local Docker namespace test |
 | Node.js | 5/5 tests passed | Minimal sample application |
-| Docker | Build, endpoints, and non-root user passed | Uses requested mutable base |
+| Docker | Hardened multi-stage build, endpoints, UID 1000, and absence of npm/Yarn in the final image passed | Digest/package pins require routine security updates |
 | Backup | Bash, ShellCheck, failure path, real local MySQL dump/gzip, and lifecycle input passed | S3 boundary mocked; no real IAM/S3 run |
 | CI/CD | Copies identical, Actionlint passed, SSM JSON/AWS input parse and six shell syntax checks passed | No SonarQube/ECR/EC2 execution |
-| Trivy | GitHub scan completed and correctly failed closed: 417 OS HIGH/CRITICAL findings plus 4 HIGH Node-package findings | Requested mutable `node:latest` base must be changed or remediated before deployment |
+| Trivy | Initial image failed closed; hardened branch retest passed with 0 Alpine and 0 Node-package findings at HIGH/CRITICAL | Re-scan every rebuilt/updated image |
 
 See `evidence/implementation-log.md` for the chronological commands, real errors, corrections, outputs, decisions, and remaining external checks.
 
@@ -170,7 +170,7 @@ See `evidence/implementation-log.md` for the chronological commands, real errors
 
 - The assessment supplied no Node.js source, so a dependency-free sample service and tests are included.
 - The required Kubernetes Service is internal `ClusterIP`.
-- `nginx:latest` is retained where explicitly requested; the Docker task's `node:latest` is retained from the candidate's interview draft. Production images should be version/digest pinned.
+- `nginx:latest` is retained where explicitly requested. The Docker task began with the candidate's `node:latest` interview draft, but the real fail-closed scan required a digest-pinned Node 24 LTS builder and minimal Alpine runtime.
 - AWS resources, identifiers, credentials, SonarQube, and a Kubernetes cluster are not assumed.
 - GitHub OIDC and EC2 instance roles are used instead of long-lived AWS keys.
 - Systems Manager is used instead of SSH. The required single-instance replacement may have brief downtime; high availability would require multiple targets and rolling or blue/green deployment.
@@ -188,7 +188,7 @@ AI assistance was used to extract and organize the assessment requirements, rese
 
 ### Manual review and modifications
 
-The candidate supplied the simple Dockerfile structure used during the live interview and asked that it remain recognizable. The final version keeps those core choices and applies only the corrections needed to build and meet the task. AI-produced work was compared with the source requirements and revised after actual lint, build, runtime, integration, and safety failures.
+The candidate supplied the simple Dockerfile structure used during the live interview and asked that it remain recognizable. The first working version preserved it closely. After the mandatory online scan found real HIGH/CRITICAL issues in `node:latest`, the final version retained the `/app`, copy, port, non-root, and direct Node entrypoint choices but adopted the official multi-stage runtime-hardening pattern. AI-produced work was compared with the source requirements and revised after actual lint, build, runtime, integration, and security-gate failures.
 
 Candidate review is still required before submission. The candidate should read every file, replace no placeholders with secrets, and be able to explain the Kubernetes selectors/probes, Nginx namespace assumption, Dockerfile trade-offs, backup credential/retention model, Trivy gate, OIDC trust, IAM permissions, SSM deployment, and every unexecuted external validation. This README must not be changed to claim a candidate review or cloud test until that review/test actually occurs.
 
@@ -200,7 +200,7 @@ AI-assisted artifacts were checked using Node's test runner, Docker build/run/in
 
 - Complete the candidate review described above.
 - Re-run the commands in `evidence/test-evidence/local-validation.md`.
-- Decide whether to retain the requested `node:latest` base and explain the intentionally blocked pipeline, or approve a supported minimal LTS/digest-pinned base and re-scan it. Do not suppress the current findings merely to make the workflow green.
+- Keep the Node/Alpine digests and fixed Alpine package versions current through reviewed updates, and require the unchanged Trivy gate to pass after every update.
 - If assessment infrastructure is provided, run the Kubernetes, SonarQube, S3/IAM, ECR, SSM, EC2, and health checks and add sanitized evidence.
 - Confirm the intended Git name/email and GitHub account before committing.
 - Confirm repository visibility and reviewer access before sharing the link.

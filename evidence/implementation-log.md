@@ -916,3 +916,23 @@ Two validation-command issues occurred after the successful build:
 2. The first corrected `docker run` omitted `--entrypoint`, so the image's real `ENTRYPOINT ["node", "server.js"]` launched the service and treated the proposed `apk` words as application arguments. The command was interrupted. Its remaining disposable container was identified by exact ID, image, name, and running state, then removed explicitly. The corrected checks used `--entrypoint apk` and `--entrypoint sh` and passed.
 
 These were test-harness errors, not application or image failures. They are retained here rather than rewritten as a clean first attempt.
+
+### Hardened candidate online attempt 2 - passed
+
+Commit `31e5cfb12a4f2c006dd2852facf72b05dd9b712b` was pushed to `runtime-hardening`, and existing workflow run `33204627031` was dispatched with `deploy=false`.
+
+Run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204627031
+
+```text
+Test and SonarQube job: passed
+Application tests: passed
+SonarQube: skipped because external configuration is absent
+Docker build: passed
+Trivy Alpine 3.24.1 target: 0 vulnerabilities
+Trivy Node-package target: 0 vulnerabilities
+Trivy step and build/scan job: passed
+AWS configuration/push/deployment: skipped because deploy=false
+Overall workflow: passed
+```
+
+The security gate itself was not changed between the failed and passing runs. The candidate is now eligible for fast-forward integration into `main`; a final `main` push run is still required before declaring the repository workflow green.

@@ -37,7 +37,7 @@ Node.js: v26.8.1
 npm: 11.19.0
 ```
 
-The validation build resolved `node:latest` to digest `sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3`. Because the submitted tag is mutable, a later build can resolve differently.
+The initial validation build resolved `node:latest` to digest `sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3`. That build remains part of the correction history. After the online failure, the hardened multi-stage candidate passed the same endpoints and UID check, ran Node v24.20.0, contained no npm/npx/Yarn runtime paths, and was 52,762,648 bytes.
 
 ## Backup automation
 
@@ -108,3 +108,18 @@ Deployment: skipped
 This definitive online result supersedes only the missing local verdict; it does not rewrite the local failure history. The fail-closed gate worked as designed. The tested image uses the requested mutable `node:latest` base. No suppression or exception was added.
 
 Workflow run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33202698261
+
+### Hardened retest
+
+The first hardened branch scan reduced the result to two HIGH OpenSSL findings. Trivy identified fixed version `3.5.8-r0` for both `libcrypto3` and `libssl3`. After installing exactly that version, the unchanged Trivy 0.74.0 gate reported:
+
+```text
+Alpine 3.24.1 target: 0 vulnerabilities
+Node package target: 0 vulnerabilities
+Trivy step: passed
+ECR/deployment: skipped because deploy=false
+```
+
+Passing branch run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204627031
+
+No ignore file, severity reduction, `ignore-unfixed` change, or success-forcing exit code was introduced.
