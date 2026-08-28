@@ -1033,3 +1033,107 @@ git diff --check
 - [x] Workflow copies remain identical.
 - [x] `git diff --check`: exit 0.
 - [x] Final diff reviewed before commit.
+
+## Phase 12 - Fresh-clone reproducibility audit
+
+### Objective
+
+I checked whether another DevOps engineer could clone the public repository and reproduce the assessment from the root README without relying on my working directory or conversation history.
+
+### Audit approach
+
+I cloned the published `main` branch into an isolated directory and treated that clone as the only available source. I checked the required file set, executable modes, local links, JSON, workflow copies, secret patterns, command coverage, and the locally executable validation paths.
+
+The main checks included:
+
+```text
+git clone <public-repository-url> <isolated-directory>
+git status --short
+git ls-files --stage
+npm ci
+npm test
+docker build --pull -t rlogical-practical-app:local .
+docker run and curl endpoint checks
+nginx -t and shared-network-namespace HTTP checks
+kubeconform strict schema validation
+shellcheck and bash -n
+actionlint
+```
+
+### Issues found and decisions
+
+1. **The README did not distinguish public access from authenticated workflow dispatch.**
+   - Root cause: the optional repository-owner `gh workflow run` command could make GitHub authentication appear necessary for general reproduction.
+   - Fix: stated that cloning, reading, local validation, and viewing the public run require no GitHub authentication. The GitHub CLI commands were removed entirely. Manual execution now uses the Actions UI for the repository owner, while independent execution uses a fork where the engineer controls workflow permissions.
+2. **The README used `curl` without naming it in the prerequisite list.**
+   - Root cause: it was treated as an assumed shell utility even though it is required by several checks.
+   - Fix: added `curl` explicitly.
+3. **The application example assumed host port 3000 was free.**
+   - Root cause: the container port and host port were written as one fixed mapping. During the clean-clone audit, an unrelated local service already owned host port 3000 and returned its own page.
+   - Fix: made the host side configurable with `APP_HOST_PORT`, bound it to `127.0.0.1`, and verified the application on an alternate free port. The container still listens on the required port 3000.
+4. **The first request could race application startup.**
+   - Root cause: `docker run --detach` returns before the Node process is necessarily ready to accept a connection.
+   - Fix: added bounded curl retries for connection refusal before the endpoint assertion.
+5. **The Nginx section reported its integration result but did not show the complete reproducible command sequence.**
+   - Root cause: the concise README retained only the syntax command while detailed evidence retained the result.
+   - Fix: added the exact shared-network-namespace test and cleanup commands to the root README.
+
+### Official references used
+
+- Docker port publishing: https://docs.docker.com/engine/network/port-publishing/
+- Docker container network namespace: https://docs.docker.com/engine/network/
+- curl retry behavior: https://curl.se/docs/manpage.html
+- GitHub Actions manual workflow execution and permission requirement: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+
+### Validation results
+
+- Dependency installation completed with zero reported npm vulnerabilities.
+- All five Node.js tests passed.
+- The Docker image built successfully from the submitted Dockerfile.
+- With `APP_HOST_PORT=33000`, `/health` returned `{"status":"ok"}` and `/` returned `{"message":"DevOps practical application"}`.
+- The running image reported Node.js `v24.20.0`.
+- The Nginx integration check returned HTTP 301 with `Location: http://www.abc.com/example?source=test`.
+- The Nginx proxy check returned `{"message":"DevOps practical application"}`.
+- Both exact test containers and the temporary application image were removed after validation.
+- README local links present: 20/20.
+- Required updated README content present: all checks passed.
+- JSON parse checks passed: 3/3 files.
+- Workflow copies remained identical.
+- Reader-directed second-person wording: 0 matches.
+- Excluded product-name wording: 0 matches.
+- Wall-clock timestamp patterns in the README: 0 matches.
+- `git diff --check`: exit 0.
+
+The first PowerShell JSON check failed because `package-lock.json` contains an empty property name and `ConvertFrom-Json` requires `-AsHashtable` for that valid npm structure. I repeated the same read-only validation with `ConvertFrom-Json -AsHashtable`; all three JSON files parsed successfully. This was a validator invocation issue, not invalid repository JSON.
+
+The `workflow_dispatch` input was checked directly in both identical workflow files: `deploy` is a required Boolean with a safe default of `false`. I did not dispatch another workflow for this documentation-only change; the existing successful code-validating run is public and remains the execution evidence.
+
+### Final result and next step
+
+The README now explains public review, repository-owner UI execution, and independent execution from a fork without requiring GitHub CLI. It also handles a host-port collision, waits through the normal detached-container startup window, and includes the complete Nginx integration procedure. The two documentation files remain local working-tree changes pending final review and an explicit commit/push decision.
+
+## Phase 13 - Reproducibility documentation publication
+
+### Objective
+
+I prepared the reviewed reproducibility corrections for publication to the public `main` branch. The authorized scope is limited to `README.md` and `evidence/implementation-log.md`.
+
+### Pre-push checks and authentication
+
+- Current branch: `main`.
+- Remote: `https://github.com/anshum940/rlogical-practical-assessment.git`.
+- Repository-local identity: `anshum940 <anshumshankhdhar2910@gmail.com>`.
+- Files selected for publication: 2 documentation files.
+- `git diff --check`: exit 0.
+- A fresh GitHub web/device authorization was completed using an isolated configuration directory outside the repository.
+- The authenticated identity was verified independently through the GitHub API as `anshum940`.
+- The authentication token remained masked and is not stored in the repository.
+- A fresh fetch showed `HEAD` and `origin/main` had no commits on either side of the comparison, so the remote had not changed before publication.
+
+### Issue and safe resolution
+
+The first elevated Git status check stopped with Git's `dubious ownership` protection because the managed sandbox owns the working tree under a different Windows SID from the authenticated desktop account. I did not weaken Git globally. Subsequent authenticated Git commands use a per-command `safe.directory` value restricted to this exact repository path.
+
+### Publication procedure
+
+Only the two reviewed documentation files will be staged. The staged diff will be checked again before creating the documentation commit and pushing `main`. After publication, the remote commit will be read back and compared with the local commit, and the isolated authentication directory will be removed.

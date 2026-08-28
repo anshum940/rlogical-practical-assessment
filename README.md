@@ -36,12 +36,15 @@ I used the following tools while implementing and validating the assessment. Equ
 - Git.
 - Docker Engine or Docker Desktop.
 - Node.js 24 or newer and npm.
+- `curl` for HTTP endpoint and redirect checks.
 - `kubectl` and a test cluster for live Kubernetes execution.
 - Nginx, or the `nginx:latest` container image, for configuration testing.
 - Bash, MySQL 8 client tools, gzip, coreutils, and AWS CLI v2 for the backup task.
 - SonarQube and an AWS environment only for the external CI/CD stages.
 
 No credential is stored in this repository. The AWS design uses GitHub OIDC and EC2 instance roles, while the backup supports a protected MySQL option file.
+
+GitHub authentication is not required to clone this public repository, run the local checks, or view the existing workflow results. Running a new workflow in the original repository is limited to accounts with write access. An independent copy can be tested by forking the repository and running the same workflow in the fork.
 
 ## Task 1 - Kubernetes
 
@@ -87,7 +90,31 @@ Expected behavior:
 - `http://abc.com/example?source=test` returns HTTP 301 with `Location: http://www.abc.com/example?source=test`.
 - `http://www.abc.com/` returns the response from the application on port 3000.
 
-I also ran an end-to-end local test and received the expected redirect and proxied application response. Because the upstream is `127.0.0.1`, Nginx and the backend must share the same host or network namespace.
+I also ran the following end-to-end local test after building the Task 3 image. Because the required upstream is `127.0.0.1:3000`, I placed Nginx in the application container's network namespace. I published Nginx only on the host loopback interface for this test.
+
+```bash
+docker run --detach --name rlogical-practical-app \
+  --publish 127.0.0.1:8080:80 \
+  rlogical-practical-app:local
+
+docker run --detach --name rlogical-nginx-test \
+  --network container:rlogical-practical-app \
+  --mount type=bind,source="$PWD/task-2-nginx/nginx.conf",target=/etc/nginx/nginx.conf,readonly \
+  nginx:latest
+
+curl --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+  --dump-header - --output /dev/null --noproxy "*" \
+  --resolve abc.com:8080:127.0.0.1 \
+  "http://abc.com:8080/example?source=test"
+
+curl --fail --silent --show-error --noproxy "*" \
+  --resolve www.abc.com:8080:127.0.0.1 \
+  http://www.abc.com:8080/
+
+docker rm --force rlogical-nginx-test rlogical-practical-app
+```
+
+The test returned the expected HTTP 301 `Location` header and the proxied application response.
 
 ## Task 3 - Dockerized Node.js application
 
@@ -108,13 +135,17 @@ npm ci
 npm test
 
 docker build --pull -t rlogical-practical-app:local .
+APP_HOST_PORT=3000
+# I use APP_HOST_PORT=33000 when host port 3000 is already occupied.
 docker run -d --name rlogical-practical-app \
-  -p 3000:3000 rlogical-practical-app:local
+  --publish "127.0.0.1:${APP_HOST_PORT}:3000" \
+  rlogical-practical-app:local
 
 docker ps --filter name=rlogical-practical-app
 docker logs rlogical-practical-app
-curl --fail http://127.0.0.1:3000/
-curl --fail http://127.0.0.1:3000/health
+curl --fail --retry 10 --retry-connrefused --retry-delay 1 \
+  "http://127.0.0.1:${APP_HOST_PORT}/health"
+curl --fail "http://127.0.0.1:${APP_HOST_PORT}/"
 docker exec rlogical-practical-app node --version
 
 docker stop rlogical-practical-app
@@ -195,16 +226,11 @@ GitHub configuration required for the external stages:
 
 A push to `main` runs tests, optional configured SonarQube analysis, image build, and the mandatory Trivy gate. I made deployment an explicit manual action using `workflow_dispatch` with `deploy=true`, so a normal source push cannot accidentally publish or replace a server.
 
-The command for a manual validation-only run is:
-
-```bash
-gh workflow run ci-cd.yml --ref main -f deploy=false
-gh run list --workflow ci-cd.yml
-```
+For a manual validation-only run as the repository owner, I open **Actions → DevOps Practical CI/CD → Run workflow** and leave `deploy` set to `false`. The same workflow can be run independently from the Actions page of a fork.
 
 I use `deploy=true` only after the documented SonarQube and AWS settings are available.
 
-The integrated `main` workflow passed application tests, image build, and Trivy with zero HIGH/CRITICAL findings: [successful GitHub Actions run](https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204905174).
+The integrated `main` workflow passed application tests, image build, and Trivy with zero HIGH/CRITICAL findings. Its [successful GitHub Actions run](https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204905174) is publicly viewable.
 
 I did not claim SonarQube, ECR, SSM, or EC2 execution because the required external infrastructure and settings were not supplied. I validated the workflow syntax, AWS request shapes, and all generated remote shell commands offline. IAM expectations and deployment behavior are documented in [the CI/CD notes](task-5-cicd/README.md).
 
