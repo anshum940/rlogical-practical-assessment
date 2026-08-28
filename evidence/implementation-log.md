@@ -118,7 +118,7 @@ The local repository is now initialized on `main`. No commit or remote operation
 - [x] Implementation files created.
 - [x] Local validation completed within the documented local scope.
 - [ ] Candidate manual review completed.
-- [ ] Git commit created.
+- [x] Git commit created.
 - [x] GitHub remote configured.
 - [ ] GitHub branch pushed.
 
@@ -773,3 +773,21 @@ The CRLF messages describe possible future Windows checkout conversion for text 
 ### Fresh GitHub authentication
 
 `gh auth status` initially found three stored accounts with invalid tokens, including an unrelated active account. None was reused or deleted. A fresh GitHub web/device authorization was completed without storing its one-time code in this repository. GitHub CLI then reported `Logged in as anshum940`, and the independent read-only API check `gh api user --jq .login` returned exactly `anshum940`. The authentication token remained masked and is not present in repository content.
+
+### Local commit and final remote safety check
+
+The clean 22-file staged set was committed locally:
+
+```text
+Commit: a52ec4b0c0bb5ee4677bc654ab22f0f1bbbbc0bf
+Subject: Complete DevOps practical assessment
+Author name: anshum940
+Author email: anshumshankhdhar2910@gmail.com
+Files: 22
+backup.sh mode: 100755
+Post-commit working tree: clean
+```
+
+The first post-commit `git ls-remote origin` attempt could not resolve the alias. Inspection found Git's Windows safe-directory protection rejecting the local repository only in the approved network process: the workspace is owned by the restricted workspace account, while the network process runs as the interactive Windows account. The normal restricted process still sees the configured `origin`, identity, and clean repository correctly.
+
+The exact-URL remote check was therefore repeated without reading local repository configuration; it exited 0 with no heads or tags, confirming the remote remained empty. The safe fix for publication is a one-command `git -c safe.directory=<exact-repository-path> push` override. This trusts only this exact repository for that Git invocation and does not modify global Git configuration. No force push will be used.
