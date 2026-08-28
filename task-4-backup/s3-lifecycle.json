@@ -1,0 +1,20 @@
+{
+  "Rules": [
+    {
+      "ID": "ExpireMySQLBackupsAfterSevenDays",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "mysql-backups/"
+      },
+      "Expiration": {
+        "Days": 7
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

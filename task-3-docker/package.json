@@ -1,0 +1,15 @@
+{
+  "name": "devops-practical-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Node.js service used to validate the Docker and CI/CD tasks.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "UNLICENSED"
+}

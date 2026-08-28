@@ -1,0 +1,22 @@
+# Dependencies and generated output
+node_modules/
+coverage/
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local backup/test artifacts
+task-4-backup/backups/
+*.sql
+*.sql.gz
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
