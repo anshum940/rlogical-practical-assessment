@@ -120,7 +120,7 @@ The local repository is now initialized on `main`. No commit or remote operation
 - [ ] Candidate manual review completed.
 - [x] Git commit created.
 - [x] GitHub remote configured.
-- [ ] GitHub branch pushed.
+- [x] GitHub branch pushed.
 
 ## Phase 2 - Kubernetes and Nginx implementation
 
@@ -791,3 +791,38 @@ Post-commit working tree: clean
 The first post-commit `git ls-remote origin` attempt could not resolve the alias. Inspection found Git's Windows safe-directory protection rejecting the local repository only in the approved network process: the workspace is owned by the restricted workspace account, while the network process runs as the interactive Windows account. The normal restricted process still sees the configured `origin`, identity, and clean repository correctly.
 
 The exact-URL remote check was therefore repeated without reading local repository configuration; it exited 0 with no heads or tags, confirming the remote remained empty. The safe fix for publication is a one-command `git -c safe.directory=<exact-repository-path> push` override. This trusts only this exact repository for that Git invocation and does not modify global Git configuration. No force push will be used.
+
+### GitHub publication and online workflow result
+
+The two prepared commits were pushed without force. Git created remote branch `main` and configured the local branch to track `origin/main`. Read-only GitHub verification reported:
+
+```text
+Repository: anshum940/rlogical-practical-assessment
+Visibility: PUBLIC
+Default branch: main
+Tested remote commit: 5ebd58575ec0aa0e3d706833ba8d7f7ec1311921
+Workflow: DevOps Practical CI/CD
+Run ID: 33202698261
+Run event: push
+```
+
+Run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33202698261
+
+Actual job result:
+
+```text
+Test and SonarQube job: passed
+Node.js install and tests: passed
+SonarQube: transparently skipped because SONAR_TOKEN/SONAR_HOST_URL are not configured
+Docker image build: passed
+Trivy setup/database download: passed
+Trivy OS result: 417 findings (361 HIGH, 56 CRITICAL)
+Trivy Node-package result: 4 findings (4 HIGH, 0 CRITICAL)
+Build/scan job: failed with exit 1 at the required security gate
+ECR authentication/push: skipped
+EC2/SSM deployment and health check: skipped
+```
+
+This is a real vulnerability verdict, unlike the earlier inconclusive local database-download attempts. The gate behaved as required: it returned nonzero and prevented publication/deployment. No severity was hidden, no ignore file was added, and the exit code was not weakened. The large result is associated with the candidate-requested mutable `node:latest` base; the sample application itself declares no third-party npm dependencies. Changing to a supported minimal LTS/digest-pinned runtime is the recommended security correction, but that change requires an explicit candidate decision because retaining `FROM node:latest` was a stated requirement.
+
+This publication-result update changes documentation only. The follow-up commit uses GitHub's documented `[skip ci]` marker so it does not launch an identical push workflow after recording the completed run: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs

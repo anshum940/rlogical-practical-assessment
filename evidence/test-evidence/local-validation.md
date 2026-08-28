@@ -80,6 +80,8 @@ The final repository audit found 22 required files with none missing, identical 
 
 ## Trivy
 
+### Local attempts
+
 Trivy 0.74.0 was invoked with `--severity HIGH,CRITICAL --exit-code 1` against `devops-practical-app:local`. Database downloads were attempted from the default mirror, Aqua Security GHCR, and Aqua Security public ECR. The mirror stalled, GHCR exceeded the default deadline, and public ECR exceeded an explicit 15-minute deadline.
 
 Final error category:
@@ -89,4 +91,20 @@ DB error: failed to download vulnerability DB
 copy error: context deadline exceeded
 ```
 
-The dedicated cache remained 4 KB, so it does not contain a complete database. No image scan verdict was produced. This result is neither a clean scan nor a HIGH/CRITICAL finding. The GitHub workflow retains the required fail-closed Trivy action; it must complete successfully on a runner with working registry throughput before ECR push is allowed.
+The dedicated cache remained 4 KB, so it does not contain a complete database. No local image-scan verdict was produced. This local result is neither a clean scan nor a HIGH/CRITICAL finding.
+
+### GitHub-hosted scan
+
+The push workflow completed Trivy setup and scanned the image for commit `5ebd58575ec0aa0e3d706833ba8d7f7ec1311921`:
+
+```text
+OS packages: 417 findings (HIGH: 361, CRITICAL: 56)
+Node packages: 4 findings (HIGH: 4, CRITICAL: 0)
+Trivy exit: 1
+ECR push: skipped
+Deployment: skipped
+```
+
+This definitive online result supersedes only the missing local verdict; it does not rewrite the local failure history. The fail-closed gate worked as designed. The tested image uses the requested mutable `node:latest` base. No suppression or exception was added.
+
+Workflow run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33202698261

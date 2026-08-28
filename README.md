@@ -162,7 +162,7 @@ Each scenario starts with evidence collection, explains why each check matters, 
 | Docker | Build, endpoints, and non-root user passed | Uses requested mutable base |
 | Backup | Bash, ShellCheck, failure path, real local MySQL dump/gzip, and lifecycle input passed | S3 boundary mocked; no real IAM/S3 run |
 | CI/CD | Copies identical, Actionlint passed, SSM JSON/AWS input parse and six shell syntax checks passed | No SonarQube/ECR/EC2 execution |
-| Trivy | Database download attempts and result documented in evidence | See `evidence/test-evidence/local-validation.md` |
+| Trivy | GitHub scan completed and correctly failed closed: 417 OS HIGH/CRITICAL findings plus 4 HIGH Node-package findings | Requested mutable `node:latest` base must be changed or remediated before deployment |
 
 See `evidence/implementation-log.md` for the chronological commands, real errors, corrections, outputs, decisions, and remaining external checks.
 
@@ -200,6 +200,7 @@ AI-assisted artifacts were checked using Node's test runner, Docker build/run/in
 
 - Complete the candidate review described above.
 - Re-run the commands in `evidence/test-evidence/local-validation.md`.
+- Decide whether to retain the requested `node:latest` base and explain the intentionally blocked pipeline, or approve a supported minimal LTS/digest-pinned base and re-scan it. Do not suppress the current findings merely to make the workflow green.
 - If assessment infrastructure is provided, run the Kubernetes, SonarQube, S3/IAM, ECR, SSM, EC2, and health checks and add sanitized evidence.
 - Confirm the intended Git name/email and GitHub account before committing.
 - Confirm repository visibility and reviewer access before sharing the link.
