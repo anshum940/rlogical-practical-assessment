@@ -881,3 +881,38 @@ Temporary validation container remaining: false
 ```
 
 The local runtime result proves application behavior and removal of the vulnerable package-manager filesystem. It does not substitute for the mandatory Trivy result. The candidate will be committed and pushed only to `runtime-hardening`, then manually dispatched through the existing GitHub workflow with `deploy=false`. `main` will not receive the Dockerfile change unless that branch passes the same online Trivy gate.
+
+### Hardened candidate online attempt 1
+
+Commit `2076f0e049dbba172a9884167fa78deabaf2e5c4` was pushed to the isolated `runtime-hardening` branch. Existing workflow run `33203937072` was manually dispatched against that ref with `deploy=false`, so AWS publication/deployment could not run.
+
+Run: https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33203937072
+
+```text
+Test and SonarQube job: passed
+Application tests: passed
+SonarQube: skipped because external configuration is absent
+Docker build: passed
+Trivy: failed with 2 HIGH, 0 CRITICAL
+ECR/EC2 stages: skipped
+```
+
+Both findings are the same fixed OpenSSL issue, `CVE-2026-14456`, in runtime packages `libcrypto3` and `libssl3`. Installed version was `3.5.7-r0`; Trivy reported `3.5.8-r0` as the fixed version. The next candidate explicitly installs/upgrades both packages to `3.5.8-r0` while preserving the same fail-closed scan. No ignore rule or severity change is introduced.
+
+### Hardened candidate attempt 2 - local result
+
+The image rebuilt successfully with both fixed packages. The health endpoint returned `ok`, the runtime UID remained 1000, and corrected package inspection reported:
+
+```text
+libcrypto3-3.5.8-r0: installed
+libssl3-3.5.8-r0: installed
+npm package-manager path: absent
+npm library tree: absent
+```
+
+Two validation-command issues occurred after the successful build:
+
+1. `apk info -v libcrypto3 libssl3` printed descriptions rather than installed version identifiers, so the assertion failed even though the build log showed the correct upgrades. The check was corrected to `apk list --installed`.
+2. The first corrected `docker run` omitted `--entrypoint`, so the image's real `ENTRYPOINT ["node", "server.js"]` launched the service and treated the proposed `apk` words as application arguments. The command was interrupted. Its remaining disposable container was identified by exact ID, image, name, and running state, then removed explicitly. The corrected checks used `--entrypoint apk` and `--entrypoint sh` and passed.
+
+These were test-harness errors, not application or image failures. They are retained here rather than rewritten as a clean first attempt.
