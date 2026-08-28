@@ -826,3 +826,58 @@ EC2/SSM deployment and health check: skipped
 This is a real vulnerability verdict, unlike the earlier inconclusive local database-download attempts. The gate behaved as required: it returned nonzero and prevented publication/deployment. No severity was hidden, no ignore file was added, and the exit code was not weakened. The large result is associated with the candidate-requested mutable `node:latest` base; the sample application itself declares no third-party npm dependencies. Changing to a supported minimal LTS/digest-pinned runtime is the recommended security correction, but that change requires an explicit candidate decision because retaining `FROM node:latest` was a stated requirement.
 
 This publication-result update changes documentation only. The follow-up commit uses GitHub's documented `[skip ci]` marker so it does not launch an identical push workflow after recording the completed run: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs
+
+## Phase 9 - Security-gate remediation
+
+### Direction and non-negotiable control
+
+The user requested that SonarQube and Trivy remain in the workflow while the pipeline is made successful. The Trivy `exit-code: 1` policy will not be changed: the assessment explicitly requires HIGH/CRITICAL findings to fail, and changing the scanner to return success while findings remain would be a false security result. The valid remediation path is to remove or upgrade vulnerable packages and re-run the same gate.
+
+SonarQube also remains in the workflow. It cannot produce a real analysis result without the external `SONAR_HOST_URL` and `SONAR_TOKEN`; non-deployment runs continue to state that absence and skip the action rather than fabricate a result. A deployment run still requires SonarQube configuration.
+
+### Candidate-base investigation
+
+- Docker Scout 1.21.0 is installed, but its CVE command required a separate Docker Hub login. No unrelated account or token was requested or reused.
+- Official Node.js sources identify Node 24 as LTS and document `node:24-alpine` as a small image variant. They also document a multi-stage pattern that copies the Node runtime into a minimal Alpine image without npm or Yarn.
+- `node:24-alpine` resolved to digest `sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf`, Alpine 3.24.1, Node v24.20.0, and npm 11.19.0.
+- Inspection showed the base's bundled npm still contains the same vulnerable package versions reported online: `brace-expansion` 5.0.7, `ip-address` 10.2.0, and `tar` 7.5.19. Merely changing the tag to Alpine would therefore not remove all Node-package findings.
+- `alpine:3.24` resolved to digest `sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b`.
+- A fresh local Trivy database attempt reached less than one percent with a multi-hour transfer estimate and was interrupted. The `--timeout 2m` setting did not bound database acquisition as expected. The temporary cache is outside the repository. Online branch validation will use the same GitHub-hosted Trivy gate that completed previously.
+
+Official references:
+
+- Node.js release list: https://nodejs.org/en/blog/release
+- Node Docker image variants: https://github.com/nodejs/docker-node/blob/main/README.md
+- Node Docker smaller-image pattern without npm/Yarn: https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md#smaller-images-without-npmyarn
+- Node Docker security responsibilities: https://github.com/nodejs/docker-node/blob/main/SECURITY.md
+
+### Hardened candidate design
+
+A separate local branch named `runtime-hardening` was created from clean `main`. The candidate Dockerfile:
+
+- Uses digest-pinned Node 24/Alpine 3.24 inputs.
+- Runs `npm ci --omit=dev` only in the build stage.
+- Copies the Node binary and application into a fresh digest-pinned Alpine runtime, so npm/Yarn and their vulnerable toolchain packages are absent from the final filesystem.
+- Installs only the required C++ runtime library.
+- Recreates UID/GID 1000, copies application files with non-root ownership, sets `NODE_ENV=production`, and retains `ENTRYPOINT ["node", "server.js"]`.
+
+This is a genuine correction driven by the real security-gate result. It supersedes the earlier preference for `FROM node:latest` only as much as required to keep the mandatory gate meaningful and passing.
+
+### Local hardened-candidate validation
+
+The first build completed successfully. Alpine package-mirror throughput was slow while installing `libgcc`/`libstdc++`, but it progressed and did not fail. Results:
+
+```text
+Application tests: 5 passed, 0 failed
+Docker build: passed
+npm build-stage audit: 0 vulnerabilities
+Health endpoint: ok
+Root endpoint: DevOps practical application
+Runtime UID: 1000
+Runtime Node.js: v24.20.0
+npm/npx/Yarn paths in final image: 0
+Final image size: 52,762,648 bytes
+Temporary validation container remaining: false
+```
+
+The local runtime result proves application behavior and removal of the vulnerable package-manager filesystem. It does not substitute for the mandatory Trivy result. The candidate will be committed and pushed only to `runtime-hardening`, then manually dispatched through the existing GitHub workflow with `deploy=false`. `main` will not receive the Dockerfile change unless that branch passes the same online Trivy gate.
