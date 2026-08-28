@@ -1,69 +1,80 @@
 # DevOps Practical Assessment
 
-I completed the six requested practical tasks in this repository: Kubernetes, Nginx, Docker, MySQL backup automation, GitHub Actions CI/CD, and troubleshooting. I have also documented my implementation decisions, validation results, external-service limitations, and AI usage.
+This repository is my submission for the DevOps practical assessment. I implemented all six tasks, tested each component as far as the available local environment allowed, and documented the results and limitations without claiming unavailable cloud execution.
 
-## Repository structure
+## Solution overview
+
+| Task | What I implemented | Main evidence |
+|---|---|---|
+| Kubernetes | Two-replica NGINX Deployment and internal `ClusterIP` Service with probes, resources, labels, and rolling updates | Strict schema validation passed for both manifests |
+| Nginx | HTTP 301 redirect from `abc.com` to `www.abc.com` and reverse proxy to `127.0.0.1:3000` | Syntax, redirect, and proxy integration tests passed |
+| Docker | Minimal Node.js service, tests, and a non-root multi-stage image | Build, tests, endpoints, UID, and Trivy gate passed |
+| Backup | MySQL dump, gzip compression, S3 upload verification, error handling, and seven-day retention | ShellCheck, failure-path, and isolated MySQL integration tests passed |
+| CI/CD | GitHub Actions pipeline for test, SonarQube, image build, Trivy, ECR, SSM deployment, and health checking | Actionlint and offline command validation passed; GitHub build/Trivy run passed |
+| Troubleshooting | Evidence-driven investigation plans for Kubernetes, Nginx, and Ubuntu incidents | All four requested scenarios are documented |
+
+## Repository layout
 
 ```text
 devops-practical/
 ├── .github/workflows/ci-cd.yml
 ├── README.md
 ├── task-1-kubernetes/
-│   ├── deployment.yaml
-│   └── service.yaml
 ├── task-2-nginx/
-│   └── nginx.conf
 ├── task-3-docker/
-│   ├── .dockerignore
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── server.js
-│   ├── sonar-project.properties
-│   └── test/server.test.js
 ├── task-4-backup/
-│   ├── backup.sh
-│   ├── retention-approach.md
-│   └── s3-lifecycle.json
 ├── task-5-cicd/
-│   ├── github-actions.yml
-│   └── README.md
 └── evidence/
-    ├── implementation-log.md
-    ├── troubleshooting-approach.md
-    └── test-evidence/local-validation.md
 ```
 
-## Prerequisites
+I kept the root README focused on my solution and reproducibility. Detailed command history, errors, fixes, and outputs are recorded in [the implementation log](evidence/implementation-log.md), and the concise executed results are in [local validation evidence](evidence/test-evidence/local-validation.md).
+
+## Environment and prerequisites
+
+I used the following tools while implementing and validating the assessment. Equivalent versions can be used to reproduce the checks.
 
 - Git.
 - Docker Engine or Docker Desktop.
-- Node.js 24 or newer and npm for host tests.
-- `kubectl` plus access to a test Kubernetes cluster for runtime deployment.
-- Bash, MySQL 8 client tools, gzip, coreutils, and AWS CLI v2 for the backup script.
-- An AWS account only for the cloud portions: an S3 bucket, ECR repository, Systems Manager-managed Ubuntu EC2 instance, and least-privilege IAM roles.
-- A SonarQube project/server and project-scoped analysis token for the quality stage.
+- Node.js 24 or newer and npm.
+- `kubectl` and a test cluster for live Kubernetes execution.
+- Nginx, or the `nginx:latest` container image, for configuration testing.
+- Bash, MySQL 8 client tools, gzip, coreutils, and AWS CLI v2 for the backup task.
+- SonarQube and an AWS environment only for the external CI/CD stages.
 
-Do not place credentials in this repository. Use a protected MySQL option file, EC2 instance roles, GitHub OIDC, GitHub Actions secrets, and variables as described below.
+No credential is stored in this repository. The AWS design uses GitHub OIDC and EC2 instance roles, while the backup supports a protected MySQL option file.
 
 ## Task 1 - Kubernetes
 
-The Deployment runs two `nginx:latest` replicas with requests/limits, readiness/liveness probes, explicit RollingUpdate settings, stable labels, and a restricted container security context. The `ClusterIP` Service exposes port 80 only inside the cluster.
+I created a two-replica NGINX Deployment with resource requests and limits, readiness and liveness probes, explicit `RollingUpdate` settings, stable labels, and a restricted container security context. The Service is internal because the assessment requires internal exposure.
+
+Files:
+
+- [deployment.yaml](task-1-kubernetes/deployment.yaml)
+- [service.yaml](task-1-kubernetes/service.yaml)
+
+Commands I would use for the required live-cluster validation:
 
 ```bash
 kubectl apply -f task-1-kubernetes/deployment.yaml \
   -f task-1-kubernetes/service.yaml
 kubectl rollout status deployment/nginx
-kubectl get deployment,pods,service,endpointslices -l app.kubernetes.io/name=nginx
+kubectl get deployment nginx
+kubectl get pods -l app.kubernetes.io/name=nginx
+kubectl get service nginx
+kubectl get endpointslices -l kubernetes.io/service-name=nginx
 kubectl port-forward service/nginx 8080:80
 curl --fail http://127.0.0.1:8080/
 ```
 
-Local schema validation passed with Kubeconform against Kubernetes 1.34. A live-cluster runtime test was not claimed because no safe cluster context was available.
+Both manifests passed strict Kubeconform validation against Kubernetes 1.34. I did not claim a live-cluster deployment because no safe test cluster was available.
 
-## Task 2 - Nginx
+## Task 2 - Nginx reverse proxy
 
-The configuration permanently redirects `abc.com` to `www.abc.com` while preserving the URI, then proxies `www.abc.com` to `127.0.0.1:3000` with forwarding headers.
+I configured `abc.com` to return HTTP 301 to the same URI on `www.abc.com`. Requests for `www.abc.com` are proxied to the application on `127.0.0.1:3000` with the standard forwarding headers.
+
+File: [nginx.conf](task-2-nginx/nginx.conf)
+
+The syntax check I used was:
 
 ```bash
 docker run --rm \
@@ -71,137 +82,195 @@ docker run --rm \
   nginx:latest nginx -t
 ```
 
-Syntax testing and an end-to-end redirect/proxy test against the included Node.js application both passed. The localhost upstream requires Nginx and the backend to share a host or network namespace.
+Expected behavior:
 
-## Task 3 - Docker
+- `http://abc.com/example?source=test` returns HTTP 301 with `Location: http://www.abc.com/example?source=test`.
+- `http://www.abc.com/` returns the response from the application on port 3000.
 
-The small Node.js application exposes `/` and `/health` on port 3000. It has no external packages or compilation step.
+I also ran an end-to-end local test and received the expected redirect and proxied application response. Because the upstream is `127.0.0.1`, Nginx and the backend must share the same host or network namespace.
+
+## Task 3 - Dockerized Node.js application
+
+The assessment did not provide application source, so I added a dependency-free Node.js service with `/` and `/health` endpoints plus five tests. I began with the simple Dockerfile structure I wrote during the live interview, then corrected its install, startup, caching, and security issues.
+
+Files:
+
+- [Dockerfile](task-3-docker/Dockerfile)
+- [.dockerignore](task-3-docker/.dockerignore)
+- [server.js](task-3-docker/server.js)
+- [server.test.js](task-3-docker/test/server.test.js)
+
+Complete workflow I used:
 
 ```bash
 cd task-3-docker
 npm ci
 npm test
-docker build --pull -t devops-practical-app:local .
-docker run --rm -p 3000:3000 devops-practical-app:local
-```
 
-In another terminal:
+docker build --pull -t rlogical-practical-app:local .
+docker run -d --name rlogical-practical-app \
+  -p 3000:3000 rlogical-practical-app:local
 
-```bash
+docker ps --filter name=rlogical-practical-app
+docker logs rlogical-practical-app
 curl --fail http://127.0.0.1:3000/
 curl --fail http://127.0.0.1:3000/health
+docker exec rlogical-practical-app node --version
+
+docker stop rlogical-practical-app
+docker rm rlogical-practical-app
+docker rmi rlogical-practical-app:local
 ```
 
-I started with the simple `FROM node:latest` Dockerfile structure that I wrote during the live technical interview. The real GitHub Trivy gate then found 417 HIGH/CRITICAL OS findings and 4 HIGH Node-package findings. I corrected the image without suppressing any finding. The final Dockerfile keeps the recognizable `/app`, dependency-copy, source-copy, and `ENTRYPOINT ["node", "server.js"]` structure, but uses an official multi-stage pattern: npm runs only in a digest-pinned Node 24 LTS builder, and the final digest-pinned Alpine runtime contains only Node and the application without npm/Yarn. I also install the exact fixed OpenSSL version reported by Trivy.
+The first `node:latest` image failed the real GitHub Trivy gate with 417 HIGH/CRITICAL OS findings and 4 HIGH Node-package findings. I kept the recognizable `/app` and direct Node entrypoint structure, but changed the implementation to a digest-pinned Node 24 builder and a minimal digest-pinned Alpine runtime without npm or Yarn. After installing the fixed OpenSSL packages reported by Trivy, the unchanged gate passed with zero HIGH/CRITICAL findings.
 
 ## Task 4 - MySQL backup to S3
 
-Required configuration:
+I wrote [backup.sh](task-4-backup/backup.sh) to create a compressed MySQL dump, validate the gzip archive, upload it with SSE-S3, verify the uploaded object size, and remove temporary local data on every exit. A critical failure returns a non-zero exit code.
+
+Configuration used by the script:
 
 ```bash
 export MYSQL_HOST='<mysql-host>'
-export MYSQL_DATABASE='<database_name>'
+export MYSQL_DATABASE='<database-name>'
 export MYSQL_USER='<backup-user>'
-export MYSQL_PORT='3306'                     # optional
-export MYSQL_DEFAULTS_FILE="$HOME/.my.cnf"  # optional protected password file
+export MYSQL_PORT='3306'
+export MYSQL_DEFAULTS_FILE="$HOME/.my.cnf"
 export S3_BUCKET='<bucket-name>'
-export S3_PREFIX='mysql-backups'             # optional
+export S3_PREFIX='mysql-backups'
 export AWS_REGION='<aws-region>'
 ```
 
-Example protected MySQL option file; create it outside the repository and set mode `600`:
+Example protected MySQL option file stored outside the repository:
 
 ```ini
 [client]
 password=<mysql-password>
 ```
 
-Run the backup:
+Execution and verification commands:
 
 ```bash
 chmod 700 task-4-backup/backup.sh
 ./task-4-backup/backup.sh
+
+aws s3 ls "s3://$S3_BUCKET/${S3_PREFIX:-mysql-backups}/" \
+  --region "$AWS_REGION"
 ```
 
-The script creates a restricted temporary `<database>_<UTC timestamp>.sql.gz`, runs `gzip -t`, uploads with SSE-S3, verifies the remote object size with `head-object`, and removes the local temporary directory on every exit. Any critical failure returns non-zero.
+The runtime identity needs `s3:PutObject` and `s3:GetObject` on the configured prefix. An identity used for manual listing also needs `s3:ListBucket`.
 
-The runtime AWS identity needs `s3:PutObject` and `s3:GetObject` on the configured prefix. To inspect objects manually, an operator with `s3:ListBucket` can run:
+I chose an S3 Lifecycle rule for seven-day retention because AWS can enforce retention independently of whether the backup server is running. The reproducible configuration is in [s3-lifecycle.json](task-4-backup/s3-lifecycle.json) and the decision is explained in [retention-approach.md](task-4-backup/retention-approach.md).
 
 ```bash
-aws s3 ls "s3://$S3_BUCKET/${S3_PREFIX:-mysql-backups}/" --region "$AWS_REGION"
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket "$S3_BUCKET" \
+  --lifecycle-configuration file://task-4-backup/s3-lifecycle.json
+
+aws s3api get-bucket-lifecycle-configuration \
+  --bucket "$S3_BUCKET"
 ```
 
-Apply and verify seven-day S3 retention using the commands in `task-4-backup/retention-approach.md`. The lifecycle administrator separately needs `s3:PutLifecycleConfiguration` and `s3:GetLifecycleConfiguration`.
+The lifecycle administrator additionally needs `s3:PutLifecycleConfiguration` and `s3:GetLifecycleConfiguration`. I validated a real dump and gzip archive against an isolated MySQL 8 container. I mocked only the AWS command boundary because no assessment bucket or IAM role was supplied.
 
 ## Task 5 - GitHub Actions CI/CD
 
-The executable workflow is `.github/workflows/ci-cd.yml`; `task-5-cicd/github-actions.yml` is an identical assessment copy. A push to `main` runs tests, configured SonarQube analysis, Docker build, and the fail-closed Trivy HIGH/CRITICAL gate. A deliberate manual run with `deploy=true` additionally performs the OIDC-authenticated ECR push, Systems Manager deployment to one Ubuntu EC2 instance, and remote health check after validating all required external settings.
+The executable workflow is [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml). The requested assessment copy is [task-5-cicd/github-actions.yml](task-5-cicd/github-actions.yml), and both files are identical.
 
-Required GitHub variables, the `SONAR_TOKEN` secret, AWS permissions, EC2 prerequisites, failure behavior, and vulnerability assumptions are documented in `task-5-cicd/README.md`.
+My pipeline performs:
 
-I did not run the cloud stages because no SonarQube or AWS assessment infrastructure was supplied. I linted the configuration and tested the generated Systems Manager request and remote shell commands offline.
+1. Checkout, Node.js 24 setup, dependency installation, and tests.
+2. SonarQube analysis when its URL and token are configured.
+3. Docker image build tagged with the immutable Git commit SHA.
+4. Fail-closed Trivy scanning for HIGH and CRITICAL OS/application findings.
+5. Short-lived GitHub OIDC authentication and ECR push.
+6. Deployment to one Systems Manager-managed Ubuntu EC2 instance.
+7. EC2-local application health checking.
 
-## Task 6 - Troubleshooting
+GitHub configuration required for the external stages:
 
-`evidence/troubleshooting-approach.md` covers:
+- Variables: `SONAR_HOST_URL`, `AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `ECR_REPOSITORY`, and `EC2_INSTANCE_ID`.
+- Secret: `SONAR_TOKEN` with project-analysis scope.
+- A protected `production` environment for deployment approval.
+
+A push to `main` runs tests, optional configured SonarQube analysis, image build, and the mandatory Trivy gate. I made deployment an explicit manual action using `workflow_dispatch` with `deploy=true`, so a normal source push cannot accidentally publish or replace a server.
+
+The command for a manual validation-only run is:
+
+```bash
+gh workflow run ci-cd.yml --ref main -f deploy=false
+gh run list --workflow ci-cd.yml
+```
+
+I use `deploy=true` only after the documented SonarQube and AWS settings are available.
+
+The integrated `main` workflow passed application tests, image build, and Trivy with zero HIGH/CRITICAL findings: [successful GitHub Actions run](https://github.com/anshum940/rlogical-practical-assessment/actions/runs/33204905174).
+
+I did not claim SonarQube, ECR, SSM, or EC2 execution because the required external infrastructure and settings were not supplied. I validated the workflow syntax, AWS request shapes, and all generated remote shell commands offline. IAM expectations and deployment behavior are documented in [the CI/CD notes](task-5-cicd/README.md).
+
+## Task 6 - Troubleshooting approach
+
+My [troubleshooting document](evidence/troubleshooting-approach.md) covers all four requested scenarios:
 
 - Pod `Running` but `READY 0/1`.
 - Healthy Pods inaccessible through a Service.
-- Nginx returning 502 for a port-3000 upstream.
-- A slow Ubuntu production server with an unavailable application.
+- Nginx returning 502 for the port-3000 upstream.
+- Slow Ubuntu production server with an unavailable application.
 
-Each scenario starts with evidence collection, explains why each check matters, and branches based on results.
+For each scenario, I start by scoping impact and collecting evidence, explain why each check matters, and choose the next step based on the result instead of jumping directly to a restart or configuration change.
 
 ## Validation summary
 
 | Area | Result | Limitation |
 |---|---|---|
 | Kubernetes | 2/2 manifests passed strict schema validation | No live cluster/admission test |
-| Nginx | `nginx -t`, HTTP 301, and reverse proxy passed | Local Docker namespace test |
-| Node.js | 5/5 tests passed | Minimal sample application |
-| Docker | Hardened multi-stage build, endpoints, UID 1000, and absence of npm/Yarn in the final image passed | Digest/package pins require routine security updates |
-| Backup | Bash, ShellCheck, failure path, real local MySQL dump/gzip, and lifecycle input passed | S3 boundary mocked; no real IAM/S3 run |
-| CI/CD | Copies identical, Actionlint passed, SSM JSON/AWS input parse and six shell syntax checks passed | No SonarQube/ECR/EC2 execution |
-| Trivy | Initial image failed closed; hardened `main` retest passed with 0 Alpine and 0 Node-package findings at HIGH/CRITICAL | Re-scan every rebuilt/updated image |
+| Nginx | Syntax, HTTP 301, and reverse proxy passed | Local namespace integration test |
+| Node.js | 5/5 tests passed | Minimal assessment application |
+| Docker | Build, endpoints, UID 1000, and minimal runtime checks passed | Image pins require routine security updates |
+| Backup | ShellCheck, Bash parsing, failure path, real local dump/gzip, and lifecycle input passed | AWS boundary mocked; no real S3/IAM run |
+| CI/CD | Workflow copies, Actionlint, AWS input parsing, and remote shell parsing passed | No SonarQube/ECR/EC2 execution |
+| Trivy | Initial image failed closed; hardened `main` image passed with zero HIGH/CRITICAL findings | Re-scan every rebuilt image |
 
-See `evidence/implementation-log.md` for the chronological commands, real errors, corrections, outputs, decisions, and remaining external checks.
+## Assumptions and decisions
 
-## Assumptions and implementation decisions
+- I added a minimal Node.js application because source code was not supplied.
+- I used an internal `ClusterIP` Service as requested.
+- I retained `nginx:latest` because the task explicitly requires it.
+- I changed my original `node:latest` Docker approach only after the required security gate proved it unsuitable.
+- I used GitHub OIDC and EC2 instance roles instead of long-lived AWS keys.
+- I used Systems Manager instead of SSH. A single-instance replacement may cause brief downtime; a production highly available service would use multiple targets with rolling or blue/green deployment.
+- I treated missing cloud infrastructure as a documented limitation rather than inventing successful results.
 
-- The assessment supplied no Node.js source, so a dependency-free sample service and tests are included.
-- The required Kubernetes Service is internal `ClusterIP`.
-- I retained `nginx:latest` because it was explicitly requested. I began the Docker task with my `node:latest` interview draft, but the real fail-closed scan required a digest-pinned Node 24 LTS builder and a minimal Alpine runtime.
-- AWS resources, identifiers, credentials, SonarQube, and a Kubernetes cluster are not assumed.
-- GitHub OIDC and EC2 instance roles are used instead of long-lived AWS keys.
-- Systems Manager is used instead of SSH. The required single-instance replacement may have brief downtime; high availability would require multiple targets and rolling or blue/green deployment.
-- Repository evidence contains no real secrets, tokens, production IP addresses, or customer data.
+## Issues encountered and fixes
+
+1. **My interview Dockerfile used `npm -I`, expected a build step that did not exist, and used shell-form `entrypoint`.** I changed the install to deterministic `npm ci`, removed the unnecessary build assumption, improved layer ordering, and used exec-form `ENTRYPOINT`.
+2. **Local Trivy database downloads did not complete.** I kept the gate fail-closed and used the GitHub-hosted run for the definitive result.
+3. **The first online image scan failed with hundreds of HIGH/CRITICAL findings.** I moved npm to a builder stage and removed npm/Yarn from the runtime image.
+4. **The first hardened image still had two HIGH OpenSSL findings.** I installed the fixed versions reported by Trivy and reran the same unchanged gate successfully.
+5. **No SonarQube or AWS deployment infrastructure was available.** I kept those stages fully configured, made deployment explicit, validated what could be checked offline, and documented the exact remaining configuration.
+
+The full chronological error and correction record is available in [evidence/implementation-log.md](evidence/implementation-log.md).
 
 ## AI usage and engineering review
 
 ### Tool
 
-I used an OpenAI coding assistant along with official vendor documentation and local validation tools while completing the assessment.
+I used an OpenAI coding assistant together with official vendor documentation and local validation tools.
 
 ### Purpose
 
-I used AI assistance to extract and organize the requirements, research official documentation, draft infrastructure and configuration files, create the minimal Node.js test application, troubleshoot errors, organize local validation, and maintain the implementation log.
+I used AI assistance to organize the requirements, research unfamiliar details, draft initial configuration and documentation, investigate errors, and structure repeatable validation.
 
 ### Manual review and modifications
 
-I supplied the simple Dockerfile structure that I used during the live interview and kept it recognizable in the first working version. After the mandatory online scan found real HIGH/CRITICAL issues in `node:latest`, I retained the `/app`, copy, port, non-root, and direct Node entrypoint choices but adopted the official multi-stage runtime-hardening pattern. I compared the AI-assisted drafts with the source requirements and revised them after actual lint, build, runtime, integration, and security-gate failures.
-
-Before I submit the repository, I still need to read every file and make sure I can explain the Kubernetes selectors and probes, the Nginx namespace assumption, Dockerfile trade-offs, the backup credential and retention model, the Trivy gate, OIDC trust, IAM permissions, SSM deployment, and every external validation that was not executed. I will not replace placeholders with secrets or claim a manual review or cloud test until I have actually completed it.
+I supplied the simple Dockerfile structure from my live interview and made the main implementation decisions, including keeping Trivy and SonarQube in the pipeline and retaining a fail-closed security policy. The initial drafts were modified after actual syntax, build, runtime, integration, and security failures. Before submission, I will complete a final file-by-file review and make sure I can explain every configuration and limitation.
 
 ### Validation
 
-I checked the AI-assisted artifacts using Node's test runner, Docker build/run/inspect, Nginx syntax and HTTP integration tests, Kubeconform, ShellCheck, Bash parsing, AWS CLI offline input parsing, Actionlint, generated-command parsing, and official documentation. I report only checks that actually passed and keep the external-service limitations explicit.
+I validated the work with Node's test runner, Docker build/run/inspect, Nginx syntax and HTTP integration tests, Kubeconform, ShellCheck, Bash parsing, AWS CLI offline input parsing, Actionlint, generated-command parsing, GitHub Actions, Trivy, and official documentation. I report only checks that actually completed and keep all external-service limitations explicit.
 
-## Before submission
+## Evidence
 
-- [ ] I have completed the manual review described above.
-- [ ] I have re-run the commands in `evidence/test-evidence/local-validation.md`.
-- [ ] I have confirmed the intended Git name/email, GitHub account, repository visibility, and reviewer access.
-- [ ] If assessment infrastructure is provided, I have run the applicable Kubernetes, SonarQube, S3/IAM, ECR, SSM, EC2, and health checks and added sanitized evidence.
-- [ ] I have confirmed that no `.env` files, option files, credentials, tokens, keys, or raw cloud output containing sensitive infrastructure details are committed.
-
-I will keep the Node/Alpine digests and fixed Alpine package versions current through reviewed updates and require the unchanged Trivy gate to pass after every update.
+- [Implementation log](evidence/implementation-log.md): chronological commands, decisions, errors, fixes, and results.
+- [Local validation evidence](evidence/test-evidence/local-validation.md): concise executed outputs.
+- [Troubleshooting approach](evidence/troubleshooting-approach.md): investigation methodology for the four scenarios.

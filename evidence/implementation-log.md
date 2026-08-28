@@ -992,3 +992,44 @@ git diff --check
 ### Commit scope
 
 Only the four reviewed Markdown files belong in this documentation-only update. The `[skip ci]` marker avoids repeating the already-passing code workflow for prose changes; the passing main workflow remains linked in Phase 9.
+
+## Phase 11 - README alignment with the assessment
+
+### Source requirement review
+
+I reread the supplied assessment before changing the root README. It explicitly requires a brief overview, prerequisites, run/test instructions for every task, assumptions, encountered issues and resolutions, AI usage and review details, and enough information for another DevOps engineer to reproduce the work.
+
+The first DOCX text-extraction attempt stopped on an embedded private-use icon because the Windows console used CP-1252 output. I reran the same read with UTF-8 output and successfully reviewed all assessment paragraphs. This was an extraction-display issue; the source document was not modified.
+
+### README design decision
+
+I changed the README from a generic operator-style runbook into a direct assessment submission:
+
+- The opening now states what I implemented and the evidence produced.
+- Each task explains my design, files, commands used, result, and limitation.
+- Required setup and execution details remain, but they are presented as reproduction evidence rather than instructions to an unspecified reader.
+- The generic pre-submission checklist was removed because it is not a required README section.
+- Assumptions, real failures, corrections, external-service limitations, and AI usage remain explicit.
+- Application, infrastructure, workflow, and security-policy files were not changed.
+
+### Commands used for this review
+
+```text
+python -c "<python-docx paragraph and table extraction with UTF-8 output>" <assessment.docx>
+rg <voice, requirement, credential, timestamp, and product-name patterns> README.md
+git diff --check
+```
+
+### Validation status
+
+- [x] All required README topics mapped to headings/content.
+- [x] Reader-directed second-person wording removed: 0 matches.
+- [x] Required task command coverage confirmed.
+- [x] Local Markdown links verified: 16/16 present.
+- [x] Malformed Markdown link lines: 0.
+- [x] High-risk secret signatures: 0 matches.
+- [x] Wall-clock timestamp signatures: 0 matches.
+- [x] Excluded AI product names: 0 matches.
+- [x] Workflow copies remain identical.
+- [x] `git diff --check`: exit 0.
+- [x] Final diff reviewed before commit.
